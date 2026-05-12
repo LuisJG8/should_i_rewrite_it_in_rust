@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    font-family:
+      "Inter",
+      "Avenir Next",
+      "Segoe UI",
+      system-ui,
+      -apple-system,
+      sans-serif;
+    line-height: 1.5;
+    font-weight: 400;
+    color: rgb(15 23 42);
+    background-color: rgb(248 250 252);
+  }
+
+  body {
+    @apply bg-slate-50 text-slate-900;
+    margin: 0;
+    min-height: 100vh;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    text-wrap: balance;
+  }
+}
+
+@layer utilities {
+  .score-high {
+    @apply text-emerald-700 bg-emerald-100 border-emerald-200;
+  }
+
+  .score-mid {
+    @apply text-amber-800 bg-amber-100 border-amber-200;
+  }
+
+  .score-low {
+    @apply text-rose-700 bg-rose-100 border-rose-200;
+  }
+}

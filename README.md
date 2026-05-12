@@ -1,6 +1,6 @@
 # rust rewrites
 
-Simple TypeScript + Tailwind website that scores open-source projects by their potential benefit if rewritten in Rust.
+Simple Astro + TypeScript + Tailwind website that scores open-source projects by their potential benefit if rewritten in Rust.
 
 ## Quick start (pnpm)
 

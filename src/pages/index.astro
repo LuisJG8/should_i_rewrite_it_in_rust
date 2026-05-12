@@ -1,0 +1,508 @@
+---
+import Icon from "../components/Icon.astro";
+import "../index.css";
+import rustMascot from "../assets/rustacean-flat-happy.png";
+
+type ScoreBand = "all" | "high" | "medium" | "low";
+type FactorSet = {
+  performance: number;
+  safety: number;
+  migration: number;
+  ecosystem: number;
+};
+
+type Project = {
+  id: string;
+  name: string;
+  summary: string;
+  why: string;
+  tags: string[];
+  factors: FactorSet;
+};
+
+type WeightedProject = Project & {
+  score: number;
+};
+
+type Weights = {
+  performance: number;
+  safety: number;
+  migration: number;
+  ecosystem: number;
+};
+
+const defaultWeights: Weights = {
+  performance: 35,
+  safety: 30,
+  migration: 15,
+  ecosystem: 20,
+};
+
+const totalScoreWeight = Object.values(defaultWeights).reduce((sum, value) => sum + value, 0);
+
+const scoringCategories = [
+  {
+    key: "performance",
+    title: "Performance upside",
+    label: "Value signal",
+    icon: "gauge",
+    color: "bg-emerald-500",
+    description: "How much a Rust rewrite could improve throughput, latency, or memory usage.",
+  },
+  {
+    key: "safety",
+    title: "Safety upside",
+    label: "Value signal",
+    icon: "shield-check",
+    color: "bg-sky-500",
+    description: "How much the project could benefit from stronger memory and concurrency safety.",
+  },
+  {
+    key: "ecosystem",
+    title: "Ecosystem fit",
+    label: "Value signal",
+    icon: "boxes",
+    color: "bg-indigo-500",
+    description: "How well Rust tooling, crates, and deployment patterns match the project.",
+  },
+  {
+    key: "migration",
+    title: "Migration complexity penalty",
+    label: "Risk signal",
+    icon: "triangle-alert",
+    color: "bg-amber-500",
+    description: "How much existing size, integrations, and compatibility requirements reduce rewrite value.",
+  },
+] satisfies Array<{
+  key: keyof Weights;
+  title: string;
+  label: string;
+  icon: "boxes" | "gauge" | "shield-check" | "triangle-alert";
+  color: string;
+  description: string;
+}>;
+
+const baseProjects: Project[] = [
+  {
+    id: "base-nodejs",
+    name: "Node.js",
+    summary:
+      "JavaScript runtime used by web servers and tooling ecosystems built around fast IO and events.",
+    why: "Rust could reduce memory spikes from GC-heavy workloads and improve raw performance for high-throughput services.",
+    tags: ["runtime", "network", "ecosystem"],
+    factors: {
+      performance: 95,
+      safety: 88,
+      migration: 64,
+      ecosystem: 90,
+    },
+  },
+  {
+    id: "base-curl",
+    name: "curl",
+    summary:
+      "A command-line tool for transferring data with URL syntax support across multiple protocols.",
+    why: "A Rust version could improve safety in URL parsing and TLS handling while preserving the compact CLI footprint.",
+    tags: ["network", "cli", "security"],
+    factors: {
+      performance: 80,
+      safety: 83,
+      migration: 45,
+      ecosystem: 72,
+    },
+  },
+  {
+    id: "base-redis",
+    name: "Redis",
+    summary:
+      "Popular in-memory data structure store, typically written in C with strict performance goals.",
+    why: "Rust can increase subsystem safety with minimal impact if focused on module boundaries and allocator-heavy parts.",
+    tags: ["datastore", "c", "high-performance"],
+    factors: {
+      performance: 78,
+      safety: 74,
+      migration: 48,
+      ecosystem: 85,
+    },
+  },
+  {
+    id: "base-ffmpeg",
+    name: "FFmpeg",
+    summary:
+      "Massive multimedia framework with wide codec and muxer support.",
+    why: "Rust rewrites could improve memory safety, but codec-module complexity means most benefit is long-term maintainability.",
+    tags: ["media", "large-codebase", "c"],
+    factors: {
+      performance: 70,
+      safety: 58,
+      migration: 76,
+      ecosystem: 66,
+    },
+  },
+  {
+    id: "base-tensorflow",
+    name: "TensorFlow",
+    summary:
+      "Machine learning library with heavy C++ and Python integrations for scale.",
+    why: "Rust could help at service boundaries, but the graph runtime depth means a full rewrite is disruptive and very large.",
+    tags: ["ml", "c++", "python"],
+    factors: {
+      performance: 60,
+      safety: 64,
+      migration: 82,
+      ecosystem: 80,
+    },
+  },
+  {
+    id: "base-gcc",
+    name: "GCC",
+    summary:
+      "GNU Compiler Collection, huge legacy C++ compiler infrastructure.",
+    why: "A full Rust rewrite is unrealistic; selective Rustization can improve safety in utilities and front-end tooling instead.",
+    tags: ["compilers", "very-large", "legacy"],
+    factors: {
+      performance: 72,
+      safety: 49,
+      migration: 94,
+      ecosystem: 57,
+    },
+  },
+];
+
+const scoreStyles: Record<"high" | "mid" | "low", string> = {
+  high: "score-high",
+  mid: "score-mid",
+  low: "score-low",
+};
+
+const scoreLevel = (score: number): "high" | "mid" | "low" => {
+  if (score >= 75) return "high";
+  if (score >= 55) return "mid";
+  return "low";
+};
+
+const scoreLabel = (score: number): string => {
+  if (score >= 75) return "High value";
+  if (score >= 55) return "Moderate value";
+  return "Low value";
+};
+
+const normalize = (value: number): number => Math.min(100, Math.max(0, Math.round(value)));
+
+function calculateScore(factors: FactorSet, weights: Weights): number {
+  const positive = factors.performance * weights.performance
+    + factors.safety * weights.safety
+    + factors.ecosystem * weights.ecosystem;
+  const penalty = factors.migration * weights.migration;
+
+  const totalWeight = weights.performance + weights.safety + weights.ecosystem + weights.migration;
+  if (totalWeight === 0) return 0;
+
+  const shifted = positive - penalty + 100 * weights.migration;
+  const maxPossible = 100 * (weights.performance + weights.safety + weights.ecosystem + weights.migration);
+  return normalize((shifted / maxPossible) * 100);
+}
+
+const scoredProjects: WeightedProject[] = baseProjects
+  .map((project) => ({
+    ...project,
+    score: calculateScore(project.factors, defaultWeights),
+  }))
+  .sort((a, b) => b.score - a.score);
+
+const buttonBase =
+  "inline-flex items-center gap-2 justify-center rounded-md text-sm font-medium ring-offset-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50";
+const buttonSm = `${buttonBase} h-9 px-3`;
+const buttonDefault = `${buttonSm} bg-slate-900 text-white hover:bg-slate-800`;
+const buttonOutline = `${buttonSm} border border-slate-200 bg-white hover:bg-slate-50`;
+const badgeBase = "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors";
+const badgeSecondary = `${badgeBase} border-slate-200 bg-slate-100 text-slate-700`;
+const badgeOutline = `${badgeBase} border-slate-300 bg-white text-slate-700 hover:bg-slate-50`;
+const card = "rounded-xl border border-slate-200 bg-white shadow-sm transition hover:border-slate-300";
+const cardHeader = "px-5 pt-5 pb-4";
+const cardTitle = "font-semibold leading-none tracking-tight text-slate-900";
+const cardDescription = "text-sm text-slate-500";
+const cardContent = "px-5 pb-5 pt-0";
+
+const initialBandFilter: ScoreBand = "all";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Rust Rewrites - score open-source projects on the value of a Rust rewrite"
+    />
+    <title>rust rewrites</title>
+  </head>
+  <body>
+    <main class="min-h-screen px-4 py-10 md:px-8">
+      <section class="mx-auto w-full max-w-6xl space-y-8">
+        <div class="grid min-h-[420px] items-center gap-8 py-12 md:grid-cols-[1fr_auto] md:gap-12 md:py-20">
+          <div class="max-w-3xl space-y-6">
+            <h1 class="font-serif text-4xl font-bold leading-[1.02] text-slate-950 md:text-6xl">
+              Should I rewrite it with <span class="text-orange-600">Rust</span>?
+            </h1>
+            <div class="max-w-2xl space-y-2">
+              <p class="text-sm leading-relaxed text-slate-600 md:text-base">
+                Add open-source projects, compare scoring factors, and rank by likely Rust conversion value.
+              </p>
+            </div>
+          </div>
+          <div class="justify-self-center md:justify-self-end">
+            <div class="relative h-56 w-64 md:h-80 md:w-96">
+              <img
+                src={rustMascot.src}
+                width={rustMascot.width}
+                height={rustMascot.height}
+                alt="Rust crab mascot"
+                class="h-full w-full object-contain"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div class={`${card} border-slate-300`}>
+          <div class={`${cardHeader} space-y-3`}>
+            <h3 class={`${cardTitle} text-lg`}>How scores are calculated</h3>
+            <p class={cardDescription}>
+              Scores are based on four categories that estimate the value of a Rust rewrite.
+            </p>
+          </div>
+          <div class={`${cardContent} space-y-5`}>
+            <div class="grid gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4 md:grid-cols-[1fr_1.3fr] md:items-center">
+              <div class="space-y-3">
+                <div>
+                  <p class="text-xl font-semibold text-slate-900">
+                    Score = upside signals - migration risk
+                  </p>
+                  <p class="mt-1 text-sm leading-relaxed text-slate-600">
+                    Performance, safety, and ecosystem fit raise the score. Migration complexity lowers it.
+                  </p>
+                </div>
+              </div>
+              <div class="space-y-3">
+                <div class="flex h-3 overflow-hidden rounded-full bg-white shadow-inner ring-1 ring-slate-200">
+                  {scoringCategories.map((category) => (
+                    <span
+                      class={category.color}
+                      style={`width: ${(defaultWeights[category.key] / totalScoreWeight) * 100}%`}
+                    ></span>
+                  ))}
+                </div>
+                <div class="grid gap-2 text-xs text-slate-600 sm:grid-cols-2">
+                  {scoringCategories.map((category) => (
+                    <div class="flex items-center justify-between gap-3">
+                      <span class="flex items-center gap-2">
+                        <span class={`h-2.5 w-2.5 rounded-full ${category.color}`}></span>
+                        {category.title}
+                      </span>
+                      <span class="font-medium text-slate-900">
+                        {defaultWeights[category.key]}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div class="grid gap-4 md:grid-cols-2">
+              {scoringCategories.map((category) => (
+                <div class="rounded-md border border-slate-200 bg-white p-4">
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="flex items-center gap-2">
+                      <span class="rounded-md bg-slate-100 p-2 text-slate-700">
+                        <Icon name={category.icon} class="h-4 w-4" />
+                      </span>
+                      <div>
+                        <h3 class="text-sm font-semibold text-slate-900">{category.title}</h3>
+                        <p class="text-xs font-medium text-slate-500">{category.label}</p>
+                      </div>
+                    </div>
+                  </div>
+                  <p class="mt-1 text-sm leading-relaxed text-slate-600">
+                    {category.description}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div class={card}>
+          <div class={`${cardHeader} space-y-4`}>
+            <div class="flex flex-wrap items-center gap-3">
+              <h2 class="text-lg font-semibold">Scoreboard</h2>
+              <Icon name="sliders-horizontal" class="h-4 w-4 text-slate-500" />
+            </div>
+            <div class="flex flex-wrap items-center gap-3 text-sm">
+              <span class="font-medium text-slate-700">Sort:</span>
+              <button
+                type="button"
+                class={buttonDefault}
+                aria-pressed="true"
+                data-sort-button="highest"
+              >
+                Highest first
+              </button>
+              <button
+                type="button"
+                class={buttonOutline}
+                aria-pressed="false"
+                data-sort-button="lowest"
+              >
+                Lowest first
+              </button>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              {(["all", "high", "medium", "low"] as ScoreBand[]).map((band) => (
+                <button
+                  type="button"
+                  class={`${band === initialBandFilter ? buttonDefault : buttonOutline} capitalize`}
+                  aria-pressed={band === initialBandFilter}
+                  data-filter-button={band}
+                >
+                  {band} band
+                </button>
+              ))}
+            </div>
+          </div>
+          <div class={cardContent}>
+            <div class="grid gap-5 sm:grid-cols-2 xl:grid-cols-3" data-project-grid>
+              {scoredProjects.map((project) => {
+                const level = scoreLevel(project.score);
+
+                return (
+                  <article
+                    class={`${card} flex h-full flex-col`}
+                    data-project-card
+                    data-score={project.score}
+                    data-level={level}
+                  >
+                    <div class={`${cardHeader} space-y-3`}>
+                      <div class="flex items-start justify-between gap-4">
+                        <div>
+                          <h3 class={`${cardTitle} text-xl`}>{project.name}</h3>
+                          <p class={`${cardDescription} mt-1 text-sm`}>{project.summary}</p>
+                        </div>
+                        <span class={`${badgeOutline} ${scoreStyles[level]} border`}>
+                          {project.score}
+                        </span>
+                      </div>
+                      <div class="flex flex-wrap gap-2">
+                        {project.tags.map((tag) => (
+                          <span class={badgeSecondary}>{tag}</span>
+                        ))}
+                      </div>
+                    </div>
+                    <div class={`${cardContent} mt-auto space-y-4`}>
+                      <p class="text-sm leading-relaxed text-slate-700">{project.why}</p>
+                      <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                        <span class="text-slate-600">Performance: {project.factors.performance}</span>
+                        <span class="text-slate-600">Safety: {project.factors.safety}</span>
+                        <span class="text-slate-600">Migration: {project.factors.migration}</span>
+                        <span class="text-slate-600">Ecosystem: {project.factors.ecosystem}</span>
+                      </div>
+                      <div class="space-y-2">
+                        <div class="flex items-center justify-between text-xs font-medium text-slate-600">
+                          <span>Rust benefit score</span>
+                          <span>{project.score}/100</span>
+                        </div>
+                        <div
+                          role="progressbar"
+                          aria-valuenow={project.score}
+                          aria-valuemin="0"
+                          aria-valuemax="100"
+                          class="relative h-2.5 w-full overflow-hidden rounded-full bg-slate-200"
+                        >
+                          <span
+                            class="block h-full w-full flex-1 rounded-full bg-gradient-to-r from-emerald-500 to-lime-500 transition-all duration-300"
+                            style={`width: ${project.score}%`}
+                          ></span>
+                        </div>
+                        <p class="text-xs font-medium text-slate-600">
+                          Level: {scoreLabel(project.score)}
+                        </p>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const buttonBase =
+        "inline-flex items-center gap-2 justify-center rounded-md text-sm font-medium ring-offset-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50";
+      const buttonSm = `${buttonBase} h-9 px-3`;
+      const buttonDefault = `${buttonSm} bg-slate-900 text-white hover:bg-slate-800`;
+      const buttonOutline = `${buttonSm} border border-slate-200 bg-white hover:bg-slate-50`;
+
+      const projectGrid = document.querySelector<HTMLElement>("[data-project-grid]");
+      const projectCards = Array.from(document.querySelectorAll<HTMLElement>("[data-project-card]"));
+      const sortButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-sort-button]"));
+      const filterButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-filter-button]"));
+
+      let sortOrder = "highest";
+      let bandFilter = "all";
+
+      function cardMatchesFilter(card: HTMLElement, filter: string) {
+        if (filter === "all") return true;
+        if (filter === "medium") return card.dataset.level === "mid";
+        return card.dataset.level === filter;
+      }
+
+      function updateButtonStates() {
+        sortButtons.forEach((button) => {
+          const isActive = button.dataset.sortButton === sortOrder;
+          button.className = isActive ? buttonDefault : buttonOutline;
+          button.setAttribute("aria-pressed", String(isActive));
+        });
+
+        filterButtons.forEach((button) => {
+          const isActive = button.dataset.filterButton === bandFilter;
+          button.className = `${isActive ? buttonDefault : buttonOutline} capitalize`;
+          button.setAttribute("aria-pressed", String(isActive));
+        });
+      }
+
+      function renderProjects() {
+        if (!projectGrid) return;
+
+        const sortedCards = [...projectCards].sort((a, b) => {
+          const aScore = Number(a.dataset.score);
+          const bScore = Number(b.dataset.score);
+          return sortOrder === "highest" ? bScore - aScore : aScore - bScore;
+        });
+
+        sortedCards.forEach((card) => {
+          const isVisible = cardMatchesFilter(card, bandFilter);
+          card.hidden = !isVisible;
+          card.style.display = isVisible ? "" : "none";
+          projectGrid.append(card);
+        });
+
+        updateButtonStates();
+      }
+
+      sortButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          sortOrder = button.dataset.sortButton || "highest";
+          renderProjects();
+        });
+      });
+
+      filterButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          bandFilter = button.dataset.filterButton || "all";
+          renderProjects();
+        });
+      });
+    </script>
+  </body>
+</html>
